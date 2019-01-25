@@ -1,12 +1,10 @@
 # Capstone-App-Backend
 Backend code for my Capstone App. Find frontend here https://github.com/mattpassarelli/Capstone-Service-Exchange-App
 
-For now: To get this up and running
+Completely had to redo my backend because I hated the idea of a Node based server, especially when I have *slight* experience with python and pymongo for MongoDB
 
-1) Run "git clone https://github.com/mattpassarelli/Capstone-App-Backend.git"
-2) Run "npm install" from the command line inside the directory you cloned to
-3) Install MongoDB (if it is not installed already), start it
-4) Run "npm start"
-
-Optional
-5) Run node_modules/babel-cli/bin/babel-node.js populate.js from the command line to populate the database. Will be automated eventually
+To run:
+    Prereqs:
+        Make sure Python 3+ is installed
+    1) in this main fodler, run "pip install -r requirements.txt"
+    2) then just run "python main.py" for the server to start
