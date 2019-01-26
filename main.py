@@ -1,12 +1,14 @@
 import pymongo
 from flask import Flask, request, jsonify, json, render_template
 from flask_socketio import SocketIO, send, emit
+from flask_cors import CORS
 
 myclient = pymongo.MongoClient("mongodb://localhost:27017/")
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'passarelli'
 socketio = SocketIO(app)
+CORS(app)
 
 
 if __name__ == '__main__':
@@ -26,7 +28,6 @@ requests = mydb["Requests"]
 # print(y.inserted_id)
 
 
-@socketio.on('_testConnection')
-def test_connection(message):
+@socketio.on('connect')
+def test_connection():
 	print("User connected")
-	send("You have connected!")
