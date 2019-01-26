@@ -3,10 +3,10 @@ from flask import Flask, request, jsonify, json, render_template
 from flask_socketio import SocketIO, send, emit
 from flask_cors import CORS
 
-myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+myclient = pymongo.MongoClient("mongodb+srv://mattpassarelli:Barisax24@uexchange-db-7skbv.mongodb.net/test?retryWrites=true")
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'passarelli'
+app.config['SECRET_KEY'] = 'Barisax24'
 socketio = SocketIO(app)
 CORS(app)
 
