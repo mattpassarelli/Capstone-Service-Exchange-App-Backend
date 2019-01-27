@@ -1,4 +1,6 @@
-const server = require('http').createServer().listen(3000);
+const PORT = process.env.PORT || 3000;
+
+const server = require('http').createServer().listen(PORT);
 const io = require('socket.io')(server);
 
 var count = 0;
