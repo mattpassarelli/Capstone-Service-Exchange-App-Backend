@@ -1,13 +1,25 @@
 <html>
-  <body>
-    <p id='server-time'></p>
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-      var socket = io();
-      var el = document.getElementById('server-time');
-      socket.on('time', function(timeString) {
-        el.innerHTML = 'Server time: ' + timeString;
+
+<body>
+  <p id='server-time'></p>
+  <p id="client-count"></p>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    var socket = io();
+    var clients = 0
+    var el = document.getElementById('server-time');
+    var count = document.getElementById('client-count')
+    socket.on('time', function (timeString) {
+      el.innerHTML = 'Server time: ' + timeString;
+
+      socket.on('connect', function () {
+        clients++;
+        count.innerHTML = 'Clients: ' + clients;
       });
-    </script>
-  </body>
+    });
+
+
+  </script>
+</body>
+
 </html>
