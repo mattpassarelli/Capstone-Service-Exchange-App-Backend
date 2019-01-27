@@ -28,6 +28,7 @@ requests = mydb["Requests"]
 # print(y.inserted_id)
 
 
-@socketio.on('connect')
+@socketio.on("connect")
 def test_connection():
-	print("User connected")
+    data = {"user" : "General Kenobi!"}
+    socketio.emit("connect", "General" + data)
