@@ -3,7 +3,7 @@ const server = require('http').createServer().listen(PORT);
 const io = require('socket.io')(server);
 const mongoose = require('mongoose')
 
-mongoose.connect('mongodb+srv://mattpassarelli:Barisax24@uexchange-db-7skbv.mongodb.net/test?retryWrites=true')
+mongoose.connect('mongodb+srv://mattpassarelli:Barisax24@uexchange-db-7skbv.mongodb.net/test?retryWrites=true', {useNewUrlParser: true})
 
 var count = 0;
 var db = mongoose.connection;
