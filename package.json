@@ -15,6 +15,6 @@
 	"dependencies": {
 		"express": "^4.16.4",
 		"mongoose": "^5.4.7",
-		"socket.io": "1.4.6"
+		"socket.io": "^2.2.0"
 	}
 }
