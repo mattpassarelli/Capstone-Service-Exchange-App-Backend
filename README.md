@@ -1,10 +1,15 @@
 # Capstone-App-Backend
 Backend code for my Capstone App. Find frontend here https://github.com/mattpassarelli/Capstone-Service-Exchange-App
 
-Completely had to redo my backend because I hated the idea of a Node based server, especially when I have *slight* experience with python and pymongo for MongoDB
+To Run
 
-To run:
-    Prereqs:
-        Make sure Python 3+ is installed
-    1) in this main fodler, run "pip install -r requirements.txt"
-    2) then just run "python main.py" for the server to start
+Prerequisites: 
+    NodeJS
+    Optional: 
+        A school whose internet doesn't make LAN super weird
+    
+1)clone this repo by doing "git clone https://github.com/mattpassarelli/Capstone-Service-Exchange-App-Backend.git"
+2)cd Capstone-App-Backend
+3)npm install && npm start (or both as separate commands if you prefer)
+
+Note: If you internet does make different devices on separate LANs (like an enterprise network at an Office or University), make sure the expo menu on the frontend in your browser has "Tunnel" enabled so you can properly connect the app
