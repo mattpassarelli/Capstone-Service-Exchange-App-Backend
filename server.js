@@ -52,17 +52,25 @@ io.on("connect", (socket) => {
 		 *  send them to where they need to go
 		 */
 
-		 //Take the newRequest var and save that to the database
-		newRequest.save(function (err) {
+		//Take the newRequest var and save that to the database
+		newRequest.save(function (err, request) {
 			if (err) throw err;
 
-			console.log("Request added")
+			console.log("Request added: " + request)
 		})
 	})
 
 	//Will gather all requests from DB and send to client on connect and refresh
 	socket.on("requestRequests", () => {
-		console.log("User has requested to gather all Requests")
+		console.log("A user is requesting to download Requests")
+		Request.find({}, function (err, data) {
+			if (!err) {
+				socket.emit("requestData", data);
+			}
+			else {
+				throw err
+			}
+		})
 	})
 })
 
