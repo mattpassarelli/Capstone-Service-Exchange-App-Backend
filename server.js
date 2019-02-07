@@ -2,6 +2,9 @@ const PORT = process.env.PORT || 3000;
 const server = require('http').createServer().listen(PORT);
 const io = require('socket.io')(server);
 const mongoose = require('mongoose')
+const bcrypt = require('bcryptjs');
+
+var nev = require('email-verification')(mongoose);
 
 mongoose.connect('mongodb+srv://mattpassarelli:Barisax24@uexchange-db-7skbv.mongodb.net/uexchange?retryWrites=true', { useNewUrlParser: true })
 
@@ -11,6 +14,12 @@ var db = mongoose.connection;
 //Scehma for the account Models
 var accountSchema = new mongoose.Schema({
 	//TODO design and implement Account requirements
+	firstName: 'string',
+	lastName: 'string',
+	email: 'string',
+	phoneNumber: 'string',
+	password: 'string',
+	verified: false,
 })
 
 //Scehma for the request Models
@@ -23,6 +32,47 @@ var requestSchema = new mongoose.Schema({
 
 var Account = mongoose.model('Account', accountSchema)
 var Request = mongoose.model('Request', requestSchema)
+
+
+nev.configure({
+	persistentUserModel: Account,
+	tempUserCollection: 'tempUsers',
+
+	transportOptions: {
+		service: 'Gmail',
+		auth: {
+			user: 'app.uexchange@gmail.com',
+			pass: 'qiL9rY!*Hwsj'
+		}
+	},
+	verifyMailOptions: {
+		from: 'Do Not Reply <mattvpassarelli@gmail.com>',
+		subject: 'Please confirm account',
+		html: 'Click the following link to confirm your account:</p><p>${URL}</p>',
+		text: 'Please confirm your account by clicking the following link: ${URL}'
+	},
+
+	shouldSendConfirmation: true,
+	confirmMailOptions: {
+		from: 'Do Not Reply <mattvpassarelli@gmail.com>',
+        subject: 'Successfully verified!',
+        html: '<p>Your account has been successfully verified.</p>',
+        text: 'Your account has been successfully verified.'
+    },
+
+
+}, function (err, other) {
+	if (err) { console.log(err) }
+})
+
+nev.generateTempUserModel(Account, function (err, tempUser) {
+	if (err) {
+		console.log(err)
+		return;
+	}
+	console.log("Temp User: " + tempUser)
+});
+
 
 //Connect to the database in MongoDB Atlas
 db.on('error', console.error.bind(console, "connection error: "));
@@ -71,6 +121,49 @@ io.on("connect", (socket) => {
 				throw err
 			}
 		})
+	})
+
+	socket.on("newUserRegistration", (data) => {
+
+		var newUser = new Account({
+			firstName: data.firstName, lastName: data.lastName,
+			email: data.email, phoneNumber: data.phoneNumber, password: data.password
+		})
+
+		nev.createTempUser(newUser, function (err, existingPersistentUser, newTempUser) {
+			// some sort of error
+			if (err) { console.log(err) }
+
+			if (existingPersistentUser) { console.log("User already exists") }
+
+			if (newTempUser) {
+				var URL = newTempUser[nev.options.URLFieldName]
+
+				nev.sendVerificationEmail(newUser.email, URL, function (err, info) {
+					if (err) { console.log(err) }
+
+				})
+			}
+			else {
+				console.log("Success?")
+			}
+		});
+
+		console.log("New user data: " + newUser)
+
+		var url = '...';
+		nev.confirmTempUser(url, function (err, user) {
+			if (err) { }
+			// handle error...
+
+			// user was found!
+			if (user) {
+				// optional
+				nev.sendConfirmationEmail(user.email, function (err, info) {
+					console.log("User is now verified")
+				});
+			}
+		});
 	})
 })
 
