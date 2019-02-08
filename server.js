@@ -4,7 +4,16 @@ const io = require('socket.io')(server);
 const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs');
 
-var nev = require('email-verification')(mongoose);
+var nodemailer = require('nodemailer');
+
+var transporter = nodemailer.createTransport({
+	service:'gmail',
+	auth: {
+		user: "app.uexchange@gmail.com",
+		pass: "qiL9rY!*Hwsj",
+	}
+})
+
 
 mongoose.connect('mongodb+srv://mattpassarelli:Barisax24@uexchange-db-7skbv.mongodb.net/uexchange?retryWrites=true', { useNewUrlParser: true })
 
@@ -19,7 +28,8 @@ var accountSchema = new mongoose.Schema({
 	email: 'string',
 	phoneNumber: 'string',
 	password: 'string',
-	verified: false,
+	verified: {type: Boolean, default: false},
+	verificationCode: {type: Number},
 })
 
 //Scehma for the request Models
@@ -32,46 +42,6 @@ var requestSchema = new mongoose.Schema({
 
 var Account = mongoose.model('Account', accountSchema)
 var Request = mongoose.model('Request', requestSchema)
-
-
-nev.configure({
-	persistentUserModel: Account,
-	tempUserCollection: 'tempUsers',
-
-	transportOptions: {
-		service: 'Gmail',
-		auth: {
-			user: 'app.uexchange@gmail.com',
-			pass: 'qiL9rY!*Hwsj'
-		}
-	},
-	verifyMailOptions: {
-		from: 'Do Not Reply <mattvpassarelli@gmail.com>',
-		subject: 'Please confirm account',
-		html: 'Click the following link to confirm your account:</p><p>${URL}</p>',
-		text: 'Please confirm your account by clicking the following link: ${URL}'
-	},
-
-	shouldSendConfirmation: true,
-	confirmMailOptions: {
-		from: 'Do Not Reply <mattvpassarelli@gmail.com>',
-        subject: 'Successfully verified!',
-        html: '<p>Your account has been successfully verified.</p>',
-        text: 'Your account has been successfully verified.'
-    },
-
-
-}, function (err, other) {
-	if (err) { console.log(err) }
-})
-
-nev.generateTempUserModel(Account, function (err, tempUser) {
-	if (err) {
-		console.log(err)
-		return;
-	}
-	console.log("Temp User: " + tempUser)
-});
 
 
 //Connect to the database in MongoDB Atlas
@@ -125,45 +95,41 @@ io.on("connect", (socket) => {
 
 	socket.on("newUserRegistration", (data) => {
 
+		//TODO: Checks for already present email addresses, to prevent multiple users
+
+		//Generates a 6 digit pin code. Ensures first digit is never 0
+		var verCode =  Math.floor(100000 + Math.random() * 900000);
+		/**
+		 * TODO: Take verCode and add it to User's AccountModel in the DB
+		 * Email ONLY verCode to user's provided email
+		 * User looks at email with code, comes back to app and types in said verCode
+		 * Cross check what user submits with what is stored in their specific Collection
+		 * If verCode && user's email (to prevent any potential overlay) == match,
+		 * set account 'verified' to true, and delete the verification code from the collection
+		 */
+
+
 		var newUser = new Account({
 			firstName: data.firstName, lastName: data.lastName,
-			email: data.email, phoneNumber: data.phoneNumber, password: data.password
+			email: data.email, phoneNumber: data.phoneNumber, password: data.password, 
 		})
 
-		nev.createTempUser(newUser, function (err, existingPersistentUser, newTempUser) {
-			// some sort of error
-			if (err) { console.log(err) }
-
-			if (existingPersistentUser) { console.log("User already exists") }
-
-			if (newTempUser) {
-				var URL = newTempUser[nev.options.URLFieldName]
-
-				nev.sendVerificationEmail(newUser.email, URL, function (err, info) {
-					if (err) { console.log(err) }
-
-				})
-			}
-			else {
-				console.log("Success?")
-			}
-		});
+		const mailOptions = {
+			from: 'app.uexchange@gmail.com', 
+			to: newUser.email, 
+			subject: "Hello there!", 
+			html:('<p>Hello there. General Kenobi. Your verification code is </p>' + verCode)
+		}
 
 		console.log("New user data: " + newUser)
 
-		var url = '...';
-		nev.confirmTempUser(url, function (err, user) {
-			if (err) { }
-			// handle error...
+		transporter.sendMail(mailOptions, function(err, info){
+			if(err){console.log(err)}
 
-			// user was found!
-			if (user) {
-				// optional
-				nev.sendConfirmationEmail(user.email, function (err, info) {
-					console.log("User is now verified")
-				});
-			}
-		});
+			else{console.log(info)}
+		})
+
+		console.log("Email should have been sent")
 	})
 })
 
