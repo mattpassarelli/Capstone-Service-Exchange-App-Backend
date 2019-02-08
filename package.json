@@ -14,9 +14,9 @@
 	"license": "ISC",
 	"dependencies": {
 		"bcryptjs": "^2.4.3",
-		"email-verification": "^0.4.6",
 		"express": "^4.16.4",
 		"mongoose": "^5.4.10",
+		"nodemailer": "^5.1.1",
 		"socket.io": "^2.2.0"
 	}
 }
