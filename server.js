@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs');
 var nodemailer = require('nodemailer');
 
 var transporter = nodemailer.createTransport({
-	service:'gmail',
+	service: 'gmail',
 	auth: {
 		user: "app.uexchange@gmail.com",
 		pass: "qiL9rY!*Hwsj",
@@ -28,8 +28,8 @@ var accountSchema = new mongoose.Schema({
 	email: 'string',
 	phoneNumber: 'string',
 	password: 'string',
-	verified: {type: Boolean, default: false},
-	verificationCode: {type: Number},
+	verified: { type: Boolean, default: false },
+	verificationCode: { type: Number },
 })
 
 //Scehma for the request Models
@@ -98,38 +98,79 @@ io.on("connect", (socket) => {
 		//TODO: Checks for already present email addresses, to prevent multiple users
 
 		//Generates a 6 digit pin code. Ensures first digit is never 0
-		var verCode =  Math.floor(100000 + Math.random() * 900000);
-		/**
-		 * TODO: Take verCode and add it to User's AccountModel in the DB
-		 * Email ONLY verCode to user's provided email
-		 * User looks at email with code, comes back to app and types in said verCode
-		 * Cross check what user submits with what is stored in their specific Collection
-		 * If verCode && user's email (to prevent any potential overlay) == match,
-		 * set account 'verified' to true, and delete the verification code from the collection
-		 */
+		var verCode = Math.floor(100000 + Math.random() * 900000);
+		var salt = bcrypt.genSaltSync(10)
+		var hash = bcrypt.hashSync(data.password, salt)
+
 
 
 		var newUser = new Account({
 			firstName: data.firstName, lastName: data.lastName,
-			email: data.email, phoneNumber: data.phoneNumber, password: data.password, 
+			email: data.email, phoneNumber: data.phoneNumber, password: hash, verificationCode: verCode
 		})
 
 		const mailOptions = {
-			from: 'app.uexchange@gmail.com', 
-			to: newUser.email, 
-			subject: "Hello there!", 
-			html:('<p>Hello there. General Kenobi. Your verification code is </p>' + verCode)
+			from: 'app.uexchange@gmail.com',
+			to: newUser.email,
+			subject: "Hello there!",
+			html: ('<p>Hello there. General Kenobi. Your verification code is </p>' + verCode)
 		}
 
 		console.log("New user data: " + newUser)
 
-		transporter.sendMail(mailOptions, function(err, info){
-			if(err){console.log(err)}
+		transporter.sendMail(mailOptions, function (err, info) {
+			if (err) { console.log(err) }
 
-			else{console.log(info)}
+			else { console.log(info) }
 		})
 
 		console.log("Email should have been sent")
+
+		newUser.save(function (err, account) {
+			if (err) { console.log(err) }
+			else {
+				console.log("Account has been added. Awaiting verification for user: " + account.email)
+			}
+		})
+	})
+
+	socket.on("verifyNewAccount", (data) => {
+
+		/**
+		 * TODO: Delete verification from document instead of setting to NULL
+		 */
+
+		console.log(data)
+
+		Account.findOne({ email: data.email }, function (err, docs) {
+			if (err) { console.log(err) }
+			else {
+				console.log(docs)
+				var rtnMessage = "Default Messages"
+				var codeFromAccount = docs.verificationCode
+				var codeFromUser = data.pinCode
+
+				console.log("User: " + codeFromUser + " " + "Account: " + codeFromAccount)
+				if (codeFromAccount === codeFromUser) {
+					console.log("Codes matched. Attempting update...")
+
+					Account.updateOne({ email: data.email }, { verified: true, verificationCode: null },
+						{
+							upsert: true,
+						},
+						function (err, response) {
+							if (err) { console.log(err) }
+						})
+
+					rtnMessage = "Verification successful"
+				}
+				else {
+					rtnMessage = "Codes do not match"
+				}
+				console.log(rtnMessage)
+				socket.emit("isAccountVerified", (rtnMessage))
+			}
+		})
 	})
 })
 
