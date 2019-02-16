@@ -14,13 +14,6 @@ var transporter = nodemailer.createTransport({
 	}
 })
 
-
-/**
- * TODO: 
- * Actually write email for verfiication code
- * Write a confirmation email
- */
-
 mongoose.connect('mongodb+srv://mattpassarelli:Barisax24@uexchange-db-7skbv.mongodb.net/uexchange?retryWrites=true', { useNewUrlParser: true })
 
 var count = 0;
@@ -40,12 +33,13 @@ var accountSchema = new mongoose.Schema({
 
 //Scehma for the request Models
 //TODO: I could not rely on an array of requests per user, instead having a visible boolean for the requests that determine if
-//they get loaded or not
+//they get loaded or not. Let's me keep all requests for any reason
 var requestSchema = new mongoose.Schema({
 	//TODO design and implement request requirements
 	title: 'string',
 	subtitle: 'string',
-	posterID: 'Number'
+	posterName: 'string',
+	posterEmail: 'string'
 })
 
 var Account = mongoose.model('Account', accountSchema)
@@ -77,7 +71,7 @@ io.on("connect", (socket) => {
 		 * Save request to User Account. Either by email or ID
 		 */
 
-		var newRequest = new Request({ title: data.title, subtitle: data.subtitle, posterID: data.posterID })
+		var newRequest = new Request({ title: data.title, subtitle: data.subtitle, posterName: data.posterName, posterEmail: data.posterEmail })
 
 		/**
 		 *  Fun fact about the save function below:
@@ -109,14 +103,13 @@ io.on("connect", (socket) => {
 
 	socket.on("newUserRegistration", (data) => {
 
-		//TODO: Checks for already present email addresses, to prevent multiple users
-
 		//Generates a 6 digit pin code. Ensures first digit is never 0
 		var verCode = Math.floor(100000 + Math.random() * 900000);
 		var salt = bcrypt.genSaltSync(10)
 		var hash = bcrypt.hashSync(data.password, salt)
+		
 
-		var verificationEmail = ('Hello there, ' + data.firstName + " " + data.lastName + ',' + "<p>&nbsp; Your verification code is </p> + <p>&nbsp; Please go back to the app and type in this code to verify your account and login.</p> <p>&nbsp;Thank you,</p>	<p>&nbsp;&nbsp; UxEchange creator Matt</p>")
+		var verificationEmail = ('Hello there, ' + data.firstName + " " + data.lastName + ',' + "<p>&nbsp; Your verification code is " + verCode + "</p> <p>&nbsp; Please go back to the app and type in this code to verify your account and login.</p> <p>&nbsp;Thank you,</p>	<p>&nbsp;&nbsp; UxEchange creator Matt</p>")
 
 		Account.findOne({ email: data.email }, function (err, doc) {
 			if (err) { console.log(err) }
@@ -134,7 +127,7 @@ io.on("connect", (socket) => {
 					from: 'app.uexchange@gmail.com',
 					to: newUser.email,
 					subject: "Hello there! UxEchange Account Verification",
-					html: (verificationEmail + verCode)
+					html: (verificationEmail)
 				}
 
 				
@@ -165,11 +158,11 @@ io.on("connect", (socket) => {
 
 		/**
 		 * TODO: Delete verification from document instead of setting to NULL
+		 * Maybe? Maybe keep it in case it's needed
 		 */
 
 		console.log(data)
 
-		var confirmationEmail = ("Hello there, " + data.firstName + " " + data.lastName + "," + "<p>&nbsp; Your account with UxEchange has been verified! You may now log into the app. </p> <p>&nbsp;Thank you,</p> <p>&nbsp;&nbsp; UxEchange creator Matt</p>")
 
 
 		Account.findOne({ email: data.email }, function (err, docs) {
@@ -179,6 +172,8 @@ io.on("connect", (socket) => {
 				var rtnMessage = "Default Messages"
 				var codeFromAccount = docs.verificationCode
 				var codeFromUser = data.pinCode
+
+				var confirmationEmail = ("Hello there, " + docs.firstName + " " + docs.lastName + "," + "<p>&nbsp; Your account with UxEchange has been verified! You may now log into the app. </p> <p>&nbsp;Thank you,</p> <p>&nbsp;&nbsp; UxEchange creator Matt</p>")
 
 				console.log("User: " + codeFromUser + " " + "Account: " + codeFromAccount)
 				if (codeFromAccount === codeFromUser) {
@@ -201,7 +196,7 @@ io.on("connect", (socket) => {
 
 				const confirmationEmailOptions = {
 					from: 'app.uexchange@gmail.com',
-					to: newUser.email,
+					to: data.email,
 					subject: "Hello there! UxEchange Account Confirmation",
 					html: (confirmationEmail)
 				}
@@ -218,13 +213,49 @@ io.on("connect", (socket) => {
 	})
 
 	socket.on("requestLogin", (data) => {
+		//console.log(data)
 
-		/**
-		 * TODO: 
-		 * 
-		 * Find by email, check passwords match -> return code -> let client process login
-		 */
-		console.log(data)
+		Account.findOne({email: data.email}, function(err, doc){
+			
+			if(err){console.log(err)}
+			else if(!doc)
+			{
+				console.log("No account found for email: " + data.email)
+				socket.emit("loginReturn", {message:"Email Not Found"})
+			}
+			else
+			{
+				//found account
+				console.log("Accound found for email: " + data.email)
+				console.log(doc)
+
+				if(doc.verified === true)
+				{
+					console.log("Account is Verified. Checking passwords")
+
+					bcrypt.compare(data.password, doc.password, function (err, res) {
+						if (err) { console.log(err) }
+						else {
+							if(res === true)
+							{
+								console.log("Passwords Match")
+								socket.emit("loginReturn", {message: "Login Accepted", firstName: doc.firstName, lastName: doc.lastName})
+							}
+							else if(res === false)
+							{
+								console.log("Passwords do not match")
+								socket.emit("loginReturn", {message:"Wrong Password"})
+							}
+						}
+					})
+				}
+				else
+				{
+					console.log("Account is not verified")
+					socket.emit("loginReturn", {message:"Account Not Verified"})	
+				}
+			}
+		})
 	})
 })
 
