@@ -29,6 +29,7 @@ var accountSchema = new mongoose.Schema({
 	password: 'string',
 	verified: { type: Boolean, default: false },
 	verificationCode: { type: Number },
+	notifications: { type: Array }
 })
 
 //Scehma for the request Models
@@ -39,12 +40,13 @@ var requestSchema = new mongoose.Schema({
 	title: 'string',
 	subtitle: 'string',
 	posterName: 'string',
-	posterEmail: 'string'
+	posterEmail: 'string',
+	fulfiller_Email: 'string',
+	dateCreated: new Date()
 })
 
 var Account = mongoose.model('Account', accountSchema)
 var Request = mongoose.model('Request', requestSchema)
-
 
 //Connect to the database in MongoDB Atlas
 db.on('error', console.error.bind(console, "connection error: "));
@@ -53,9 +55,16 @@ db.once('open', function () {
 })
 
 //Listen for a client to connect
-io.on("connect", (socket) => {
+io.on("connection", (socket) => {
+
 	count++;
 	console.log("User connected. User count: " + count);
+
+	socket.on("join", (data) => {
+		console.log("User is: " + data.email)
+		socket.join(data.email)
+	})
+
 
 	//listens for client disconnectes
 	socket.on("disconnect", () => {
@@ -107,7 +116,7 @@ io.on("connect", (socket) => {
 		var verCode = Math.floor(100000 + Math.random() * 900000);
 		var salt = bcrypt.genSaltSync(10)
 		var hash = bcrypt.hashSync(data.password, salt)
-		
+
 
 		var verificationEmail = ('Hello there, ' + data.firstName + " " + data.lastName + ',' + "<p>&nbsp; Your verification code is " + verCode + "</p> <p>&nbsp; Please go back to the app and type in this code to verify your account and login.</p> <p>&nbsp;Thank you,</p>	<p>&nbsp;&nbsp; UxEchange creator Matt</p>")
 
@@ -130,7 +139,7 @@ io.on("connect", (socket) => {
 					html: (verificationEmail)
 				}
 
-				
+
 
 				console.log("New user data: " + newUser)
 
@@ -146,7 +155,7 @@ io.on("connect", (socket) => {
 					if (err) { console.log(err) }
 					else {
 						console.log("Account has been added. Awaiting verification for user: " + account.email)
-						
+
 						socket.emit("creationReturn", ("Email Not Used"))
 					}
 				})
@@ -201,9 +210,9 @@ io.on("connect", (socket) => {
 					html: (confirmationEmail)
 				}
 
-				transporter.sendMail(confirmationEmailOptions, function(err, info){
-					if(err){console.log(err)}
-					else{
+				transporter.sendMail(confirmationEmailOptions, function (err, info) {
+					if (err) { console.log(err) }
+					else {
 						console.log(info)
 					}
 				})
@@ -215,45 +224,104 @@ io.on("connect", (socket) => {
 	socket.on("requestLogin", (data) => {
 		//console.log(data)
 
-		Account.findOne({email: data.email}, function(err, doc){
-			
-			if(err){console.log(err)}
-			else if(!doc)
-			{
+		Account.findOne({ email: data.email }, function (err, doc) {
+
+			if (err) { console.log(err) }
+			else if (!doc) {
 				console.log("No account found for email: " + data.email)
-				socket.emit("loginReturn", {message:"Email Not Found"})
+				socket.emit("loginReturn", { message: "Email Not Found" })
 			}
-			else
-			{
+			else {
 				//found account
 				console.log("Accound found for email: " + data.email)
 				console.log(doc)
 
-				if(doc.verified === true)
-				{
+				if (doc.verified === true) {
 					console.log("Account is Verified. Checking passwords")
 
 					bcrypt.compare(data.password, doc.password, function (err, res) {
 						if (err) { console.log(err) }
 						else {
-							if(res === true)
-							{
+							if (res === true) {
 								console.log("Passwords Match")
-								socket.emit("loginReturn", {message: "Login Accepted", firstName: doc.firstName, lastName: doc.lastName})
+								socket.emit("loginReturn", { message: "Login Accepted", firstName: doc.firstName, lastName: doc.lastName })
 							}
-							else if(res === false)
-							{
+							else if (res === false) {
 								console.log("Passwords do not match")
-								socket.emit("loginReturn", {message:"Wrong Password"})
+								socket.emit("loginReturn", { message: "Wrong Password" })
 							}
 						}
 					})
 				}
-				else
-				{
+				else {
 					console.log("Account is not verified")
-					socket.emit("loginReturn", {message:"Account Not Verified"})	
+					socket.emit("loginReturn", { message: "Account Not Verified" })
 				}
+			}
+		})
+	})
+
+	//Someone has offered to fulfill a request
+	socket.on("offerToConnect", (data) => {
+		console.log(data)
+
+		//Find the request the user selected
+		Request.findOne({ _id: data.request_ID }, function (err, requestDoc) {
+			if (err) { console.log(err) }
+			else {
+				console.log("Request found: " + requestDoc)
+
+				//Add the fulfiller to the Request under the fulfiller_Email section
+				Request.updateOne({ _id: data.request_ID }, { fulfiller_Email: data.fulfiller },
+					{
+						upsert: true,
+					},
+					function (err, response) {
+						if (err) { console.log(err) }
+						else {
+
+							//Find that user and grab data from them so we can use it
+							Account.findOne({ email: data.fulfiller }, function (err, doc) {
+								if (err) { console.log(err) }
+								else {
+									var fullName = doc.firstName + " " + doc.lastName
+									console.log("Fulfiller name: " + fullName)
+
+									console.log("Fulfiller added to Request!")
+
+									var notificationData =
+									{
+										notification_id: new mongoose.mongo.ObjectID,
+										fulFuller_Email: data.fulfiller,
+										fulFiller_Name: fullName,
+										requestTitle: requestDoc.title
+									}
+
+									/**Find the OP of the request and 
+									 * add a new Notification with details
+									 * about the fulfiller and the request the selected
+									*/
+									Account.findOne({ email: requestDoc.posterEmail }, function (err, accountDoc) {
+										if (err) { console.log(err) }
+										else {
+											console.log("Poster email: " + requestDoc.posterEmail)
+											Account.updateOne({ email: requestDoc.posterEmail }, { $push: { notifications: notificationData } },
+												function (err, response) {
+													if (err) { console.log(err) }
+													else {
+														console.log("Added to Account: " + notificationData)
+													}
+												})
+										}
+									})
+
+
+									//console.log(requestDoc.posterEmail)
+									//io.sockets.in(requestDoc.posterEmail).emit("newFulfillerNotification", (submitData))
+								}
+							})
+						}
+					})
 			}
 		})
 	})
