@@ -42,7 +42,7 @@ var requestSchema = new mongoose.Schema({
 	posterName: 'string',
 	posterEmail: 'string',
 	fulfiller_Email: 'string',
-	dateCreated: new Date()
+	dateCreated: {type: String, default: new Date()}
 })
 
 var Account = mongoose.model('Account', accountSchema)
@@ -292,9 +292,10 @@ io.on("connection", (socket) => {
 									var notificationData =
 									{
 										notification_id: new mongoose.mongo.ObjectID,
-										fulFuller_Email: data.fulfiller,
+										fulFiller_Email: data.fulfiller,
 										fulFiller_Name: fullName,
-										requestTitle: requestDoc.title
+										requestTitle: requestDoc.title,
+										dateOfNotification: new Date()
 									}
 
 									/**Find the OP of the request and 
@@ -322,6 +323,20 @@ io.on("connection", (socket) => {
 							})
 						}
 					})
+			}
+		})
+	})
+
+	//Pull notifications for the user requesting
+	socket.on("pullNotifications", (data) =>{
+		console.log("User is requesting to pull notifications. User is: " + data)
+
+		Account.findOne({email: data}, function(err, doc){
+			if(err){console.log(err)}
+			else{
+				var notes = doc.notifications
+
+				socket.emit("receiveNotifications", (notes))
 			}
 		})
 	})
