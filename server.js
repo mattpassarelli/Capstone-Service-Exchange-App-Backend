@@ -45,8 +45,20 @@ var requestSchema = new mongoose.Schema({
 	dateCreated: {type: String, default: new Date()}
 })
 
+var conversationSchema = new mongoose.Schema({
+	user1: 'string',
+	user2: 'string',
+	user1Name: 'string',
+	user2Name: 'string',
+	messages: {type: Array},
+	dateCreated: {type: String, default: new Date()},
+	request_ID: mongoose.mongo.ObjectID,
+	requestType: 'string'
+})
+
 var Account = mongoose.model('Account', accountSchema)
 var Request = mongoose.model('Request', requestSchema)
+var Conversation = mongoose.model('Conversation', conversationSchema)
 
 //Connect to the database in MongoDB Atlas
 db.on('error', console.error.bind(console, "connection error: "));
@@ -80,7 +92,11 @@ io.on("connection", (socket) => {
 		 * Save request to User Account. Either by email or ID
 		 */
 
-		var newRequest = new Request({ title: data.title, subtitle: data.subtitle, posterName: data.posterName, posterEmail: data.posterEmail })
+		var newRequest = new Request({ 
+			title: data.title, 
+			subtitle: data.subtitle, 
+			posterName: data.posterName, 
+			posterEmail: data.posterEmail })
 
 		/**
 		 *  Fun fact about the save function below:
@@ -122,10 +138,12 @@ io.on("connection", (socket) => {
 
 		Account.findOne({ email: data.email }, function (err, doc) {
 			if (err) { console.log(err) }
+			//Acount already found
 			else if (doc) {
 				console.log("Account found. Duplicate email: " + doc)
 				socket.emit("creationReturn", ("Email Already Used"))
 			}
+			//No account found
 			else {
 				var newUser = new Account({
 					firstName: data.firstName, lastName: data.lastName,
@@ -138,8 +156,6 @@ io.on("connection", (socket) => {
 					subject: "Hello there! UxEchange Account Verification",
 					html: (verificationEmail)
 				}
-
-
 
 				console.log("New user data: " + newUser)
 
@@ -291,11 +307,12 @@ io.on("connection", (socket) => {
 
 									var notificationData =
 									{
-										notification_id: new mongoose.mongo.ObjectID,
 										fulFiller_Email: data.fulfiller,
 										fulFiller_Name: fullName,
 										requestTitle: requestDoc.title,
-										dateOfNotification: new Date()
+										requestBody: requestDoc.subtitle,
+										dateOfNotification: new Date(),
+										request_ID: requestDoc._id
 									}
 
 									/**Find the OP of the request and 
@@ -337,6 +354,55 @@ io.on("connection", (socket) => {
 				var notes = doc.notifications
 
 				socket.emit("receiveNotifications", (notes))
+			}
+		})
+	})
+
+	socket.on("createConversation", (data) => {
+		console.log("Convo Data Received: " + (data))
+
+		 Conversation.findOne({request_ID: data.request_ID}, function(err, convoDoc){
+			 if(err){console.log(err)}
+			 //Conversation related to request found
+			 else if(convoDoc){
+				socket.emit("convoReturn", (true))
+			 }
+			 //no conversation exists
+			 else{
+				var newConversation = new Conversation({
+					user1: data.user1,
+					user2: data.user2,
+					user1Name: data.user1Name,
+					user2Name: data.user2Name,
+					request_ID: data.request_ID,
+					requestType: data.requestType
+				})
+
+				console.log("Conversation created")
+
+				newConversation.save(function(err, convo){
+					if(err){console.log(err)}
+					else{
+						console.log("Conversation Saved to DB: " + convo)
+						socket.emit("convoReturn", (false))
+					}
+				})
+			 }
+		 })
+	})
+
+	socket.on("requestConversations", (data) =>{
+		console.log("User is requesting their conversations. User is: " + data)
+
+		Conversation.find({email: data.email}, function(err, docs){
+			if(err){console.log(err)}
+			//found conversations with that email
+			else if(docs){
+				console.log(docs)
+				socket.emit("conversationsFound", (docs))
+			}
+			else{
+				console.log("User " + data.email + " is not in any conversations")
 			}
 		})
 	})
