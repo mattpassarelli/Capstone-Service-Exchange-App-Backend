@@ -391,9 +391,6 @@ io.on("connection", (socket) => {
 		 })
 	})
 
-	/**
-	 * TODO: FIX PEOPLE BEING ABLE TO SEE OTHER MESSAGES
-	 */
 	socket.on("requestConversations", (data) =>{
 		console.log("User is requesting their conversations. User is: " + data.email)
 
