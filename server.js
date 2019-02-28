@@ -391,13 +391,17 @@ io.on("connection", (socket) => {
 		 })
 	})
 
+	/**
+	 * TODO: FIX PEOPLE BEING ABLE TO SEE OTHER MESSAGES
+	 */
 	socket.on("requestConversations", (data) =>{
-		console.log("User is requesting their conversations. User is: " + data)
+		console.log("User is requesting their conversations. User is: " + data.email)
 
-		Conversation.find({email: data.email}, function(err, docs){
+		Conversation.find({$or: [{user1: data.email}, {user2: data.email}]}, function(err, docs){
 			if(err){console.log(err)}
 			//found conversations with that email
 			else if(docs){
+				console.log("Potentially Found conversations with that email.")
 				console.log(docs)
 				socket.emit("conversationsFound", (docs))
 			}
@@ -405,6 +409,12 @@ io.on("connection", (socket) => {
 				console.log("User " + data.email + " is not in any conversations")
 			}
 		})
+	})
+
+	socket.on("addMessageToConvo", (data) => {
+		console.log("Messages are: " + "Messages: " + data.messages + " ID: " + data._ID)
+
+		
 	})
 })
 
