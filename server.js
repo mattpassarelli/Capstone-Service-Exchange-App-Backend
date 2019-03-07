@@ -42,7 +42,7 @@ var requestSchema = new mongoose.Schema({
 	posterName: 'string',
 	posterEmail: 'string',
 	fulfiller_Email: 'string',
-	dateCreated: {type: String, default: new Date()}
+	dateCreated: { type: String, default: new Date() }
 })
 
 var conversationSchema = new mongoose.Schema({
@@ -50,8 +50,8 @@ var conversationSchema = new mongoose.Schema({
 	user2: 'string',
 	user1Name: 'string',
 	user2Name: 'string',
-	messages: {type: Array},
-	dateCreated: {type: String, default: new Date()},
+	messages: { type: Array },
+	dateCreated: { type: String, default: new Date() },
 	request_ID: mongoose.mongo.ObjectID,
 	requestType: 'string'
 })
@@ -77,7 +77,6 @@ io.on("connection", (socket) => {
 		socket.join(data.email)
 	})
 
-
 	//listens for client disconnectes
 	socket.on("disconnect", () => {
 		count--;
@@ -92,11 +91,12 @@ io.on("connection", (socket) => {
 		 * Save request to User Account. Either by email or ID
 		 */
 
-		var newRequest = new Request({ 
-			title: data.title, 
-			subtitle: data.subtitle, 
-			posterName: data.posterName, 
-			posterEmail: data.posterEmail })
+		var newRequest = new Request({
+			title: data.title,
+			subtitle: data.subtitle,
+			posterName: data.posterName,
+			posterEmail: data.posterEmail
+		})
 
 		/**
 		 *  Fun fact about the save function below:
@@ -345,12 +345,12 @@ io.on("connection", (socket) => {
 	})
 
 	//Pull notifications for the user requesting
-	socket.on("pullNotifications", (data) =>{
+	socket.on("pullNotifications", (data) => {
 		console.log("User is requesting to pull notifications. User is: " + data)
 
-		Account.findOne({email: data}, function(err, doc){
-			if(err){console.log(err)}
-			else{
+		Account.findOne({ email: data }, function (err, doc) {
+			if (err) { console.log(err) }
+			else {
 				var notes = doc.notifications
 
 				socket.emit("receiveNotifications", (notes))
@@ -361,14 +361,14 @@ io.on("connection", (socket) => {
 	socket.on("createConversation", (data) => {
 		console.log("Convo Data Received: " + (data))
 
-		 Conversation.findOne({request_ID: data.request_ID}, function(err, convoDoc){
-			 if(err){console.log(err)}
-			 //Conversation related to request found
-			 else if(convoDoc){
+		Conversation.findOne({ request_ID: data.request_ID }, function (err, convoDoc) {
+			if (err) { console.log(err) }
+			//Conversation related to request found
+			else if (convoDoc) {
 				socket.emit("convoReturn", (true))
-			 }
-			 //no conversation exists
-			 else{
+			}
+			//no conversation exists
+			else {
 				var newConversation = new Conversation({
 					user1: data.user1,
 					user2: data.user2,
@@ -380,38 +380,91 @@ io.on("connection", (socket) => {
 
 				console.log("Conversation created")
 
-				newConversation.save(function(err, convo){
-					if(err){console.log(err)}
-					else{
+				newConversation.save(function (err, convo) {
+					if (err) { console.log(err) }
+					else {
 						console.log("Conversation Saved to DB: " + convo)
 						socket.emit("convoReturn", (false))
 					}
 				})
-			 }
-		 })
+			}
+		})
 	})
 
-	socket.on("requestConversations", (data) =>{
+	socket.on("requestConversations", (data) => {
 		console.log("User is requesting their conversations. User is: " + data.email)
 
-		Conversation.find({$or: [{user1: data.email}, {user2: data.email}]}, function(err, docs){
-			if(err){console.log(err)}
+		Conversation.find({ $or: [{ user1: data.email }, { user2: data.email }] }, function (err, docs) {
+			if (err) { console.log(err) }
 			//found conversations with that email
-			else if(docs){
+			else if (docs) {
 				console.log("Potentially Found conversations with that email.")
 				console.log(docs)
 				socket.emit("conversationsFound", (docs))
 			}
-			else{
+			else {
 				console.log("User " + data.email + " is not in any conversations")
 			}
 		})
 	})
 
-	socket.on("addMessageToConvo", (data) => {
-		console.log("Messages are: " + "Messages: " + data.messages + " ID: " + data._ID)
+	socket.on("requestUserID", (data) => {
+		console.log("User is requesting their User_ID: " + data.email)
 
-		
+		Account.findOne({ email: data.email }, function (err, doc) {
+			console.log("Account Found: " + doc)
+
+			var user_ID = doc._id
+			console.log("ID is: " + user_ID)
+
+			socket.emit("userIDGiven", (user_ID))
+		})
+	})
+
+	socket.on("addMessageToConvo", (data) => {
+		console.log("ID: " + data._ID)
+		console.log("Messages: " + data.messages)
+
+		Conversation.findOneAndUpdate({ _id: data._ID }, { $push: { messages: data.messages } },
+			function (err, reponse) {
+				if (err) { console.log(err) }
+				else {
+					console.log("Added: " + data.messages + " to conversation: " + data._ID)
+
+					//emit the socket to tell the other user to pull the message
+					//IF they are actively in the chat screen
+
+					//Does NOT work lmao
+					// socket.emit("pullNewMessage")
+					socket.broadcast.emit("pullNewMessage")
+				}
+			})
+	})
+
+	socket.on("requestConversationMessages", (data) => {
+		console.log("Convo_ID for requesting Messages received is: " + data.convo_ID)
+		console.log("Looking for conversation with that ID")
+
+		Conversation.findOne({ _id: data.convo_ID }, function (err, convo) {
+			if (err) { console.log(err) }
+			else {
+				console.log("Conversation found. Grabbing Messages")
+
+				var messages = convo.messages
+				console.log("Messages are: " + convo.messages)
+				//or because I can't make JSONs work
+				console.log("Messages are: " + convo)
+				/**
+				 * I guess since I have no real contorl over how I'm
+				 * pulling the data from the DB, the messages come in
+				 * reverse order. No big deal, I'll just flip the array.
+				 */
+
+				messages.reverse()
+
+				socket.emit("conversationMessagesReceived", (messages))
+			}
+		})
 	})
 })
 
