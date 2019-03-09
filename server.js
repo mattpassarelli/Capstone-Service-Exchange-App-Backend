@@ -32,9 +32,6 @@ var accountSchema = new mongoose.Schema({
 	notifications: { type: Array }
 })
 
-//Scehma for the request Models
-//TODO: I could not rely on an array of requests per user, instead having a visible boolean for the requests that determine if
-//they get loaded or not. Let's me keep all requests for any reason
 var requestSchema = new mongoose.Schema({
 	//TODO design and implement request requirements
 	title: 'string',
@@ -42,7 +39,8 @@ var requestSchema = new mongoose.Schema({
 	posterName: 'string',
 	posterEmail: 'string',
 	fulfiller_Email: 'string',
-	dateCreated: { type: String, default: new Date() }
+	dateCreated: { type: String, default: new Date() },
+	isPublic: { type: Boolean, default: true }
 })
 
 var conversationSchema = new mongoose.Schema({
@@ -113,10 +111,10 @@ io.on("connection", (socket) => {
 		})
 	})
 
-	//Will gather all requests from DB and send to client on connect and refresh
+	//Will gather all requests (that are public/"not deleted") from DB and send to client on connect and on refresh
 	socket.on("requestRequests", () => {
 		console.log("A user is requesting to download Requests")
-		Request.find({}, function (err, data) {
+		Request.find({ isPublic: true }, function (err, data) {
 			if (!err) {
 				socket.emit("requestData", data);
 			}
@@ -463,6 +461,20 @@ io.on("connection", (socket) => {
 				messages.reverse()
 
 				socket.emit("conversationMessagesReceived", (messages))
+			}
+		})
+	})
+
+	socket.on("requestPersonalRequests", (data) => {
+		console.log("User requesting their personal Requests: " + data)
+
+		Request.find({ $and: [{ posterEmail: data }, { isPublic: true }] }, function (err, docs) {
+			if (err) { console.log(err) }
+			else {
+				console.log("Requests found for user: " + docs)
+				console.log("Found Requests. Sending to user")
+
+				socket.emit("personalRequestsReceived", (docs))
 			}
 		})
 	})
