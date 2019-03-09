@@ -25,7 +25,6 @@ var accountSchema = new mongoose.Schema({
 	firstName: 'string',
 	lastName: 'string',
 	email: 'string',
-	phoneNumber: 'string',
 	password: 'string',
 	verified: { type: Boolean, default: false },
 	verificationCode: { type: Number },
@@ -145,7 +144,7 @@ io.on("connection", (socket) => {
 			else {
 				var newUser = new Account({
 					firstName: data.firstName, lastName: data.lastName,
-					email: data.email, phoneNumber: data.phoneNumber, password: hash, verificationCode: verCode
+					email: data.email, password: hash, verificationCode: verCode
 				})
 
 				const verificationEmailOptions = {
