@@ -38,6 +38,7 @@ var requestSchema = new mongoose.Schema({
 	posterName: 'string',
 	posterEmail: 'string',
 	fulfiller_Email: 'string',
+	fulfiller_Name: 'string',
 	dateCreated: { type: String, default: new Date() },
 	isPublic: { type: Boolean, default: true }
 })
@@ -50,7 +51,8 @@ var conversationSchema = new mongoose.Schema({
 	messages: { type: Array },
 	dateCreated: { type: String, default: new Date() },
 	request_ID: mongoose.mongo.ObjectID,
-	requestType: 'string'
+	requestType: 'string',
+	isPublic: { type: Boolean, default: true }
 })
 
 var Account = mongoose.model('Account', accountSchema)
@@ -285,7 +287,7 @@ io.on("connection", (socket) => {
 				console.log("Request found: " + requestDoc)
 
 				//Add the fulfiller to the Request under the fulfiller_Email section
-				Request.updateOne({ _id: data.request_ID }, { fulfiller_Email: data.fulfiller },
+				Request.updateOne({ _id: data.request_ID }, { fulfiller_Email: data.fulfiller, fulfiller_Name: data.fulFiller_Name },
 					{
 						upsert: true,
 					},
@@ -391,7 +393,14 @@ io.on("connection", (socket) => {
 	socket.on("requestConversations", (data) => {
 		console.log("User is requesting their conversations. User is: " + data.email)
 
-		Conversation.find({ $or: [{ user1: data.email }, { user2: data.email }] }, function (err, docs) {
+		Conversation.find({
+			$and: [
+				{
+					$or: [{ user1: data.email }, { user2: data.email }],
+				},
+				{ isPublic: true }
+			]
+		}, function (err, docs) {
 			if (err) { console.log(err) }
 			//found conversations with that email
 			else if (docs) {
@@ -474,6 +483,32 @@ io.on("connection", (socket) => {
 				console.log("Found Requests. Sending to user")
 
 				socket.emit("personalRequestsReceived", (docs))
+			}
+		})
+	})
+
+	socket.on("deletePersonalRequest", (request_ID) => {
+		console.log("Requesting to delete request with ID: " + request_ID)
+
+		Request.findOne({ _id: request_ID }, function (err, doc) {
+			if (err) {
+				console.log(error)
+				socket.emit("deletingRequestCallback", ("error"))
+			}
+			else {
+				console.log("Request found. Deleting...")
+
+				Request.findOneAndUpdate({ _id: request_ID }, { isPublic: false }, function (err, response) {
+					if (err) { console.log(err) }
+					else {
+						Conversation.findOneAndUpdate({ request_ID: request_ID }, { isPublic: false }, function (err, response) {
+							if (err) { console.log(err) }
+							else {
+								socket.emit("deletingRequestCallback", ("success"))
+							}
+						})
+					}
+				})
 			}
 		})
 	})
