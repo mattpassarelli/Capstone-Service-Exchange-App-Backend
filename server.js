@@ -1,5 +1,3 @@
-import { MONGO_URL, APP_EMAIL, APP_EMAIL_PASSWORD } from "./constants"
-
 const PORT = process.env.PORT || 3000;
 const server = require('http').createServer().listen(PORT);
 const io = require('socket.io')(server);
@@ -7,16 +5,18 @@ const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs');
 
 var nodemailer = require('nodemailer');
+var CONSTANTS = require('./constants') 
+
 
 var transporter = nodemailer.createTransport({
 	service: 'gmail',
 	auth: {
-		user: APP_EMAIL,
-		pass: APP_EMAIL_PASSWORD,
+		user: CONSTANTS.APP_EMAIL,
+		pass: CONSTANTS.APP_EMAIL_PASSWORD,
 	}
 })
 
-mongoose.connect(MONGO_URL, { useNewUrlParser: true })
+mongoose.connect(CONSTANTS.MONGO_URL, { useNewUrlParser: true })
 
 var count = 0;
 var db = mongoose.connection;
@@ -152,7 +152,7 @@ io.on("connection", (socket) => {
 				})
 
 				const verificationEmailOptions = {
-					from: APP_EMAIL,
+					from: CONSTANTS.APP_EMAIL,
 					to: newUser.email,
 					subject: "Hello there! UxEchange Account Verification",
 					html: (verificationEmail)
@@ -221,7 +221,7 @@ io.on("connection", (socket) => {
 				console.log(rtnMessage)
 
 				const confirmationEmailOptions = {
-					from: APP_EMAIL,
+					from: CONSTANTS.APP_EMAIL,
 					to: data.email,
 					subject: "Hello there! UxEchange Account Confirmation",
 					html: (confirmationEmail)
