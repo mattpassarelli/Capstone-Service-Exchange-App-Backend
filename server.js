@@ -5,16 +5,18 @@ const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs');
 
 var nodemailer = require('nodemailer');
+var CONSTANTS = require('./constants') 
+
 
 var transporter = nodemailer.createTransport({
 	service: 'gmail',
 	auth: {
-		user: "app.uexchange@gmail.com",
-		pass: "qiL9rY!*Hwsj",
+		user: CONSTANTS.APP_EMAIL,
+		pass: CONSTANTS.APP_EMAIL_PASSWORD,
 	}
 })
 
-mongoose.connect('mongodb+srv://mattpassarelli:Barisax24@uexchange-db-7skbv.mongodb.net/uexchange?retryWrites=true', { useNewUrlParser: true })
+mongoose.connect(CONSTANTS.MONGO_URL, { useNewUrlParser: true })
 
 var count = 0;
 var db = mongoose.connection;
@@ -25,16 +27,12 @@ var accountSchema = new mongoose.Schema({
 	firstName: 'string',
 	lastName: 'string',
 	email: 'string',
-	phoneNumber: 'string',
 	password: 'string',
 	verified: { type: Boolean, default: false },
 	verificationCode: { type: Number },
 	notifications: { type: Array }
 })
 
-//Scehma for the request Models
-//TODO: I could not rely on an array of requests per user, instead having a visible boolean for the requests that determine if
-//they get loaded or not. Let's me keep all requests for any reason
 var requestSchema = new mongoose.Schema({
 	//TODO design and implement request requirements
 	title: 'string',
@@ -42,7 +40,9 @@ var requestSchema = new mongoose.Schema({
 	posterName: 'string',
 	posterEmail: 'string',
 	fulfiller_Email: 'string',
-	dateCreated: {type: String, default: new Date()}
+	fulfiller_Name: 'string',
+	dateCreated: { type: String, default: new Date() },
+	isPublic: { type: Boolean, default: true }
 })
 
 var conversationSchema = new mongoose.Schema({
@@ -50,10 +50,11 @@ var conversationSchema = new mongoose.Schema({
 	user2: 'string',
 	user1Name: 'string',
 	user2Name: 'string',
-	messages: {type: Array},
-	dateCreated: {type: String, default: new Date()},
+	messages: { type: Array },
+	dateCreated: { type: String, default: new Date() },
 	request_ID: mongoose.mongo.ObjectID,
-	requestType: 'string'
+	requestType: 'string',
+	isPublic: { type: Boolean, default: true }
 })
 
 var Account = mongoose.model('Account', accountSchema)
@@ -77,7 +78,6 @@ io.on("connection", (socket) => {
 		socket.join(data.email)
 	})
 
-
 	//listens for client disconnectes
 	socket.on("disconnect", () => {
 		count--;
@@ -92,11 +92,12 @@ io.on("connection", (socket) => {
 		 * Save request to User Account. Either by email or ID
 		 */
 
-		var newRequest = new Request({ 
-			title: data.title, 
-			subtitle: data.subtitle, 
-			posterName: data.posterName, 
-			posterEmail: data.posterEmail })
+		var newRequest = new Request({
+			title: data.title,
+			subtitle: data.subtitle,
+			posterName: data.posterName,
+			posterEmail: data.posterEmail
+		})
 
 		/**
 		 *  Fun fact about the save function below:
@@ -113,10 +114,10 @@ io.on("connection", (socket) => {
 		})
 	})
 
-	//Will gather all requests from DB and send to client on connect and refresh
+	//Will gather all requests (that are public/"not deleted") from DB and send to client on connect and on refresh
 	socket.on("requestRequests", () => {
 		console.log("A user is requesting to download Requests")
-		Request.find({}, function (err, data) {
+		Request.find({ isPublic: true }, function (err, data) {
 			if (!err) {
 				socket.emit("requestData", data);
 			}
@@ -147,11 +148,11 @@ io.on("connection", (socket) => {
 			else {
 				var newUser = new Account({
 					firstName: data.firstName, lastName: data.lastName,
-					email: data.email, phoneNumber: data.phoneNumber, password: hash, verificationCode: verCode
+					email: data.email, password: hash, verificationCode: verCode
 				})
 
 				const verificationEmailOptions = {
-					from: 'app.uexchange@gmail.com',
+					from: CONSTANTS.APP_EMAIL,
 					to: newUser.email,
 					subject: "Hello there! UxEchange Account Verification",
 					html: (verificationEmail)
@@ -220,7 +221,7 @@ io.on("connection", (socket) => {
 				console.log(rtnMessage)
 
 				const confirmationEmailOptions = {
-					from: 'app.uexchange@gmail.com',
+					from: CONSTANTS.APP_EMAIL,
 					to: data.email,
 					subject: "Hello there! UxEchange Account Confirmation",
 					html: (confirmationEmail)
@@ -288,7 +289,7 @@ io.on("connection", (socket) => {
 				console.log("Request found: " + requestDoc)
 
 				//Add the fulfiller to the Request under the fulfiller_Email section
-				Request.updateOne({ _id: data.request_ID }, { fulfiller_Email: data.fulfiller },
+				Request.updateOne({ _id: data.request_ID }, { fulfiller_Email: data.fulfiller, fulfiller_Name: data.fulFiller_Name },
 					{
 						upsert: true,
 					},
@@ -345,12 +346,12 @@ io.on("connection", (socket) => {
 	})
 
 	//Pull notifications for the user requesting
-	socket.on("pullNotifications", (data) =>{
+	socket.on("pullNotifications", (data) => {
 		console.log("User is requesting to pull notifications. User is: " + data)
 
-		Account.findOne({email: data}, function(err, doc){
-			if(err){console.log(err)}
-			else{
+		Account.findOne({ email: data }, function (err, doc) {
+			if (err) { console.log(err) }
+			else {
 				var notes = doc.notifications
 
 				socket.emit("receiveNotifications", (notes))
@@ -361,14 +362,14 @@ io.on("connection", (socket) => {
 	socket.on("createConversation", (data) => {
 		console.log("Convo Data Received: " + (data))
 
-		 Conversation.findOne({request_ID: data.request_ID}, function(err, convoDoc){
-			 if(err){console.log(err)}
-			 //Conversation related to request found
-			 else if(convoDoc){
+		Conversation.findOne({ request_ID: data.request_ID }, function (err, convoDoc) {
+			if (err) { console.log(err) }
+			//Conversation related to request found
+			else if (convoDoc) {
 				socket.emit("convoReturn", (true))
-			 }
-			 //no conversation exists
-			 else{
+			}
+			//no conversation exists
+			else {
 				var newConversation = new Conversation({
 					user1: data.user1,
 					user2: data.user2,
@@ -380,38 +381,138 @@ io.on("connection", (socket) => {
 
 				console.log("Conversation created")
 
-				newConversation.save(function(err, convo){
-					if(err){console.log(err)}
-					else{
+				newConversation.save(function (err, convo) {
+					if (err) { console.log(err) }
+					else {
 						console.log("Conversation Saved to DB: " + convo)
 						socket.emit("convoReturn", (false))
 					}
 				})
-			 }
-		 })
+			}
+		})
 	})
 
-	socket.on("requestConversations", (data) =>{
+	socket.on("requestConversations", (data) => {
 		console.log("User is requesting their conversations. User is: " + data.email)
 
-		Conversation.find({$or: [{user1: data.email}, {user2: data.email}]}, function(err, docs){
-			if(err){console.log(err)}
+		Conversation.find({
+			$and: [
+				{
+					$or: [{ user1: data.email }, { user2: data.email }],
+				},
+				{ isPublic: true }
+			]
+		}, function (err, docs) {
+			if (err) { console.log(err) }
 			//found conversations with that email
-			else if(docs){
+			else if (docs) {
 				console.log("Potentially Found conversations with that email.")
 				console.log(docs)
 				socket.emit("conversationsFound", (docs))
 			}
-			else{
+			else {
 				console.log("User " + data.email + " is not in any conversations")
 			}
 		})
 	})
 
-	socket.on("addMessageToConvo", (data) => {
-		console.log("Messages are: " + "Messages: " + data.messages + " ID: " + data._ID)
+	socket.on("requestUserID", (data) => {
+		console.log("User is requesting their User_ID: " + data.email)
 
-		
+		Account.findOne({ email: data.email }, function (err, doc) {
+			console.log("Account Found: " + doc)
+
+			var user_ID = doc._id
+			console.log("ID is: " + user_ID)
+
+			socket.emit("userIDGiven", (user_ID))
+		})
+	})
+
+	socket.on("addMessageToConvo", (data) => {
+		console.log("ID: " + data._ID)
+		console.log("Messages: " + data.messages)
+
+		Conversation.findOneAndUpdate({ _id: data._ID }, { $push: { messages: data.messages } },
+			function (err, reponse) {
+				if (err) { console.log(err) }
+				else {
+					console.log("Added: " + data.messages + " to conversation: " + data._ID)
+
+					//emit the socket to tell the other user to pull the message
+					//IF they are actively in the chat screen
+
+					//Does NOT work lmao
+					// socket.emit("pullNewMessage")
+					socket.broadcast.emit("pullNewMessage")
+				}
+			})
+	})
+
+	socket.on("requestConversationMessages", (data) => {
+		console.log("Convo_ID for requesting Messages received is: " + data.convo_ID)
+		console.log("Looking for conversation with that ID")
+
+		Conversation.findOne({ _id: data.convo_ID }, function (err, convo) {
+			if (err) { console.log(err) }
+			else {
+				console.log("Conversation found. Grabbing Messages")
+
+				var messages = convo.messages
+				console.log("Messages are: " + convo.messages)
+				//or because I can't make JSONs work
+				console.log("Messages are: " + convo)
+				/**
+				 * I guess since I have no real contorl over how I'm
+				 * pulling the data from the DB, the messages come in
+				 * reverse order. No big deal, I'll just flip the array.
+				 */
+
+				messages.reverse()
+
+				socket.emit("conversationMessagesReceived", (messages))
+			}
+		})
+	})
+
+	socket.on("requestPersonalRequests", (data) => {
+		console.log("User requesting their personal Requests: " + data)
+
+		Request.find({ $and: [{ posterEmail: data }, { isPublic: true }] }, function (err, docs) {
+			if (err) { console.log(err) }
+			else {
+				console.log("Requests found for user: " + docs)
+				console.log("Found Requests. Sending to user")
+
+				socket.emit("personalRequestsReceived", (docs))
+			}
+		})
+	})
+
+	socket.on("deletePersonalRequest", (request_ID) => {
+		console.log("Requesting to delete request with ID: " + request_ID)
+
+		Request.findOne({ _id: request_ID }, function (err, doc) {
+			if (err) {
+				console.log(error)
+				socket.emit("deletingRequestCallback", ("error"))
+			}
+			else {
+				console.log("Request found. Deleting...")
+
+				Request.findOneAndUpdate({ _id: request_ID }, { isPublic: false }, function (err, response) {
+					if (err) { console.log(err) }
+					else {
+						Conversation.findOneAndUpdate({ request_ID: request_ID }, { isPublic: false }, function (err, response) {
+							if (err) { console.log(err) }
+							else {
+								socket.emit("deletingRequestCallback", ("success"))
+							}
+						})
+					}
+				})
+			}
+		})
 	})
 })
 
