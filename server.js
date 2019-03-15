@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const fetch = require('node-fetch');
 
 var nodemailer = require('nodemailer');
-var CONSTANTS = require('./constants') 
+var CONSTANTS = require('./constants')
 
 
 var transporter = nodemailer.createTransport({
@@ -44,7 +44,8 @@ var requestSchema = new mongoose.Schema({
 	fulfiller_Email: 'string',
 	fulfiller_Name: 'string',
 	dateCreated: { type: String, default: new Date() },
-	isPublic: { type: Boolean, default: true }
+	isPublic: { type: Boolean, default: true },
+	posterExpoToken: 'string',
 })
 
 var conversationSchema = new mongoose.Schema({
@@ -52,6 +53,8 @@ var conversationSchema = new mongoose.Schema({
 	user2: 'string',
 	user1Name: 'string',
 	user2Name: 'string',
+	user1ExpoToken: 'string',
+	user2ExpoToken: 'string',
 	messages: { type: Array },
 	dateCreated: { type: String, default: new Date() },
 	request_ID: mongoose.mongo.ObjectID,
@@ -91,8 +94,8 @@ io.on("connection", (socket) => {
 
 		try {
 			Account.findOneAndUpdate({ email: data.email }, { expoNotificationToken: data.token }, function (err, doc) {
-				if(err){console.log(err)}
-				else{
+				if (err) { console.log(err) }
+				else {
 					console.log("Notification token added to account")
 				}
 			})
@@ -104,31 +107,32 @@ io.on("connection", (socket) => {
 
 	//takes Request data from frontend and adds to database
 	socket.on("saveRequest", (data) => {
-		/**
-		 * TODO: 
-		 * 
-		 * Save request to User Account. Either by email or ID
-		 */
+		console.log("REQUEST DATA RECEVIED: ", data.posterEmail)
+		Account.findOne({ email: data.posterEmail }, function (err, doc) {
+			if (err) { console.log(err) }
+			else if (doc) {
+				var newRequest = new Request({
+					title: data.title,
+					subtitle: data.subtitle,
+					posterName: data.posterName,
+					posterEmail: data.posterEmail,
+					posterExpoToken: doc.expoNotificationToken
+				})
 
-		var newRequest = new Request({
-			title: data.title,
-			subtitle: data.subtitle,
-			posterName: data.posterName,
-			posterEmail: data.posterEmail
-		})
+				/**
+				 *  Fun fact about the save function below:
+				 *  Mongoose automatically looks for the plural version of your model name,
+				 *  saves me the trouble of having to figure out how to figure out how to 
+				 *  send them to where they need to go
+				 */
 
-		/**
-		 *  Fun fact about the save function below:
-		 *  Mongoose automatically looks for the plural version of your model name,
-		 *  saves me the trouble of having to figure out how to figure out how to 
-		 *  send them to where they need to go
-		 */
+				//Take the newRequest var and save that to the database
+				newRequest.save(function (err, request) {
+					if (err) throw err;
 
-		//Take the newRequest var and save that to the database
-		newRequest.save(function (err, request) {
-			if (err) throw err;
-
-			console.log("Request added: " + request)
+					console.log("Request added: " + request)
+				})
+			}
 		})
 	})
 
@@ -324,15 +328,7 @@ io.on("connection", (socket) => {
 
 									console.log("Fulfiller added to Request!")
 
-									var notificationData =
-									{
-										fulFiller_Email: data.fulfiller,
-										fulFiller_Name: fullName,
-										requestTitle: requestDoc.title,
-										requestBody: requestDoc.subtitle,
-										dateOfNotification: new Date(),
-										request_ID: requestDoc._id
-									}
+									
 
 									/**Find the OP of the request and 
 									 * add a new Notification with details
@@ -341,6 +337,17 @@ io.on("connection", (socket) => {
 									Account.findOne({ email: requestDoc.posterEmail }, function (err, accountDoc) {
 										if (err) { console.log(err) }
 										else {
+											var notificationData =
+									{
+										fulFiller_Email: data.fulfiller,
+										fulFiller_Name: fullName,
+										fulfiller_ExpoToken: doc.expoNotificationToken,
+										posterExpoToken: accountDoc.expoNotificationToken,
+										requestTitle: requestDoc.title,
+										requestBody: requestDoc.subtitle,
+										dateOfNotification: new Date(),
+										request_ID: requestDoc._id
+									}
 											console.log("Poster email: " + requestDoc.posterEmail)
 											Account.updateOne({ email: requestDoc.posterEmail }, { $push: { notifications: notificationData } },
 												function (err, response) {
@@ -351,23 +358,8 @@ io.on("connection", (socket) => {
 												})
 											console.log("Sending push notification")
 											let token = accountDoc.expoNotificationToken
-											console.log("ACCOUNT TOKEN: " + token)
-											
-											let response = fetch("https://exp.host/--/api/v2/push/send", {
-												method: 'POST',
-												headers: {
-													accept: 'application/json',
-													'content-type': 'application/json'
-												},
-												body:{
-													to: token,
-													sound: 'default',
-													title: 'Test NOTE',
-													body: 'THIS IS ONLY FOR TESTINGS'
-												}
-											})
 
-											console.log("RESPONSE: " + response)
+											//this.sendNotification(token)
 										}
 									})
 
@@ -381,6 +373,8 @@ io.on("connection", (socket) => {
 			}
 		})
 	})
+
+
 
 	//Pull notifications for the user requesting
 	socket.on("pullNotifications", (data) => {
