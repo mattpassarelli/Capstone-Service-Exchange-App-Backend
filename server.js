@@ -3,6 +3,7 @@ const server = require('http').createServer().listen(PORT);
 const io = require('socket.io')(server);
 const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs');
+const fetch = require('node-fetch');
 
 var nodemailer = require('nodemailer');
 var CONSTANTS = require('./constants') 
@@ -30,7 +31,8 @@ var accountSchema = new mongoose.Schema({
 	password: 'string',
 	verified: { type: Boolean, default: false },
 	verificationCode: { type: Number },
-	notifications: { type: Array }
+	notifications: { type: Array },
+	expoNotificationToken: 'string'
 })
 
 var requestSchema = new mongoose.Schema({
@@ -82,6 +84,22 @@ io.on("connection", (socket) => {
 	socket.on("disconnect", () => {
 		count--;
 		console.log("User disconnected. User count: " + count)
+	})
+
+	socket.on("addNotificationTokenToAccount", (data) => {
+		console.log("Notification Data: ", [data.token, data.email])
+
+		try {
+			Account.findOneAndUpdate({ email: data.email }, { expoNotificationToken: data.token }, function (err, doc) {
+				if(err){console.log(err)}
+				else{
+					console.log("Notification token added to account")
+				}
+			})
+		}
+		catch (error) {
+			console.log(error)
+		}
 	})
 
 	//takes Request data from frontend and adds to database
@@ -331,6 +349,25 @@ io.on("connection", (socket) => {
 														console.log("Added to Account: " + notificationData)
 													}
 												})
+											console.log("Sending push notification")
+											let token = accountDoc.expoNotificationToken
+											console.log("ACCOUNT TOKEN: " + token)
+											
+											let response = fetch("https://exp.host/--/api/v2/push/send", {
+												method: 'POST',
+												headers: {
+													accept: 'application/json',
+													'content-type': 'application/json'
+												},
+												body:{
+													to: token,
+													sound: 'default',
+													title: 'Test NOTE',
+													body: 'THIS IS ONLY FOR TESTINGS'
+												}
+											})
+
+											console.log("RESPONSE: " + response)
 										}
 									})
 
