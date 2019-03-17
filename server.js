@@ -407,7 +407,9 @@ io.on("connection", (socket) => {
 					user1Name: data.user1Name,
 					user2Name: data.user2Name,
 					request_ID: data.request_ID,
-					requestType: data.requestType
+					requestType: data.requestType,
+					user1ExpoToken: data.user1ExpoToken,
+					user2ExpoToken: data.user2ExpoToken
 				})
 
 				console.log("Conversation created")
