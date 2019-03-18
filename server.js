@@ -547,6 +547,36 @@ io.on("connection", (socket) => {
 			}
 		})
 	})
+
+	socket.on("removeConversationOnly", (convo_ID) => {
+		console.log("Deleting conversation only with ID: " + convo_ID)
+
+		Conversation.findOneAndUpdate({ _id: convo_ID }, { isPublic: false }, function (err, response) {
+			if (err) { 
+				console.log(err) 
+				socket.emit("removingConversationCallback", ("error"))
+			}
+			else {
+				socket.emit("removingConversationCallback", ("success"))
+			}
+		})
+	})
+
+	socket.on("requestConversationRequestCreator", (request_ID) => {
+		console.log("Getting creator email for request: " + request_ID)
+
+		try {
+			Request.findOne({ _id: request_ID }, function (err, doc) {
+				if (err) { console.log(err) }
+				else {
+					socket.emit("requestCreatorEmailReceived", doc.posterEmail)
+				}
+			})
+		}
+		catch (error) {
+			console.log(error)
+		}
+	})
 })
 
 
