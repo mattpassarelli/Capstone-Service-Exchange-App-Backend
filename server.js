@@ -189,7 +189,8 @@ io.on("connection", (socket) => {
 				else {
 					var newUser = new Account({
 						firstName: data.firstName, lastName: data.lastName,
-						email: data.email, password: hash, verificationCode: verCode
+						email: data.email, password: hash, verificationCode: verCode,
+						expoNotificationToken: data.expoNotificationToken
 					})
 
 					const verificationEmailOptions = {
@@ -253,25 +254,27 @@ io.on("connection", (socket) => {
 							})
 
 						rtnMessage = "Verification successful"
+
+						const confirmationEmailOptions = {
+							from: CONSTANTS.APP_EMAIL,
+							to: data.email,
+							subject: "Hello there! UxEchange Account Confirmation",
+							html: (confirmationEmail)
+						}
+	
+						transporter.sendMail(confirmationEmailOptions, function (err, info) {
+							if (err) { console.log(err) }
+							else {
+								console.log(info)
+							}
+						})
 					}
 					else {
 						rtnMessage = "Codes do not match"
 					}
 					console.log(rtnMessage)
 
-					const confirmationEmailOptions = {
-						from: CONSTANTS.APP_EMAIL,
-						to: data.email,
-						subject: "Hello there! UxEchange Account Confirmation",
-						html: (confirmationEmail)
-					}
-
-					transporter.sendMail(confirmationEmailOptions, function (err, info) {
-						if (err) { console.log(err) }
-						else {
-							console.log(info)
-						}
-					})
+					
 					socket.emit("isAccountVerified", (rtnMessage))
 				}
 			})
