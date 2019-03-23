@@ -3,10 +3,17 @@ const server = require('http').createServer().listen(PORT);
 const io = require('socket.io')(server);
 const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs');
-const fetch = require('node-fetch');
+const Verifier = require("email-verifier");
 
 var nodemailer = require('nodemailer');
 var CONSTANTS = require('./constants')
+let verifier = new Verifier(CONSTANTS.WHOIS_API_KEY, {
+	checkCatchAll: false,
+	checkDisposable: false,
+	checkFree: false,
+	validateDNS: true,
+	validateSMTP: true
+});
 
 
 var transporter = nodemailer.createTransport({
@@ -113,7 +120,7 @@ io.on("connection", (socket) => {
 	socket.on("saveRequest", (data) => {
 		try {
 			console.log("REQUEST DATA RECEVIED: ", data.posterEmail)
-		
+
 			Account.findOne({ email: data.posterEmail }, function (err, doc) {
 				if (err) { console.log(err) }
 				else if (doc) {
@@ -185,45 +192,68 @@ io.on("connection", (socket) => {
 					console.log("Account found. Duplicate email: " + doc)
 					socket.emit("creationReturn", ("Email Already Used"))
 				}
+
 				//No account found
 				else {
-					var newUser = new Account({
-						firstName: data.firstName, lastName: data.lastName,
-						email: data.email, password: hash, verificationCode: verCode,
-						expoNotificationToken: data.expoNotificationToken
-					})
-
-					const verificationEmailOptions = {
-						from: CONSTANTS.APP_EMAIL,
-						to: newUser.email,
-						subject: "Hello there! UxEchange Account Verification",
-						html: (verificationEmail)
-					}
-
-					console.log("New user data: " + newUser)
-
-					transporter.sendMail(verificationEmailOptions, function (err, info) {
-						if (err) { console.log(err) }
-
-						else { console.log(info) }
-					})
-
-					console.log("Email should have been sent")
-
-					newUser.save(function (err, account) {
-						if (err) { console.log(err) }
+					//Verify email with WHOIS to make sure it's a valid email
+					verifier.verify(data.email, (error, rtn) => {
+						if (error) { console.log(error) }
 						else {
-							console.log("Account has been added. Awaiting verification for user: " + account.email)
+							console.log(rtn)
 
-							socket.emit("creationReturn", ("Email Not Used"))
+							if (rtn.formatCheck === 'true' && rtn.smtpCheck === 'true' && rtn.dnsCheck === 'true') {
+								console.log("FORMATING GOOD!!")
+
+								var newUser = new Account({
+									firstName: data.firstName, lastName: data.lastName,
+									email: data.email, password: hash, verificationCode: verCode,
+									expoNotificationToken: data.expoNotificationToken
+								})
+
+								const verificationEmailOptions = {
+									from: CONSTANTS.APP_EMAIL,
+									to: newUser.email,
+									subject: "Hello there! UxEchange Account Verification",
+									html: (verificationEmail)
+								}
+
+								console.log("New user data: " + newUser)
+
+								transporter.sendMail(verificationEmailOptions, function (err, info) {
+									if (err) { console.log(err) }
+
+									else { console.log(info) }
+								})
+
+								console.log("Email should have been sent")
+
+								newUser.save(function (err, account) {
+									if (err) { console.log(err) }
+									else {
+										console.log("Account has been added. Awaiting verification for user: " + account.email)
+
+										socket.emit("creationReturn", ("Email Not Used"))
+									}
+								})
+							}
+							else {
+								console.log("Error with email validation")
+								socket.emit("creationReturn", ("Error with Email"))
+							}
 						}
 					})
+
 				}
+
 			})
 		}
+
+
 		catch (error) {
 			console.error(error)
 		}
+
+
 	})
 
 	socket.on("verifyNewAccount", (data) => {
@@ -261,7 +291,7 @@ io.on("connection", (socket) => {
 							subject: "Hello there! UxEchange Account Confirmation",
 							html: (confirmationEmail)
 						}
-	
+
 						transporter.sendMail(confirmationEmailOptions, function (err, info) {
 							if (err) { console.log(err) }
 							else {
@@ -274,7 +304,7 @@ io.on("connection", (socket) => {
 					}
 					console.log(rtnMessage)
 
-					
+
 					socket.emit("isAccountVerified", (rtnMessage))
 				}
 			})
