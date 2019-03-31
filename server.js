@@ -30,6 +30,18 @@ var count = 0;
 var db = mongoose.connection;
 
 //Scehma for the account Models
+var notificationSchema = new mongoose.Schema({
+	fulFiller_Email: 'string',
+	fulFiller_Name: 'string',
+	fulfiller_ExpoToken: 'string',
+	posterExpoToken: 'string',
+	requestTitle: 'string',
+	requestBody: 'string',
+	dateOfNotification: { type: String, default: new Date() },
+	request_ID: mongoose.mongo.ObjectID,
+	notification_ID: mongoose.mongo.ObjectID
+})
+
 var accountSchema = new mongoose.Schema({
 	//TODO design and implement Account requirements
 	firstName: 'string',
@@ -38,7 +50,7 @@ var accountSchema = new mongoose.Schema({
 	password: 'string',
 	verified: { type: Boolean, default: false },
 	verificationCode: { type: Number },
-	notifications: { type: Array },
+	notifications: [notificationSchema],
 	expoNotificationToken: 'string'
 })
 
@@ -195,6 +207,11 @@ io.on("connection", (socket) => {
 
 				//No account found
 				else {
+
+					/**
+					 * TODO: ADD CALLBack for if this whole thing fails
+					 */
+
 					//Verify email with WHOIS to make sure it's a valid email
 					verifier.verify(data.email, (error, rtn) => {
 						if (error) { console.log(error) }
@@ -397,35 +414,29 @@ io.on("connection", (socket) => {
 										Account.findOne({ email: requestDoc.posterEmail }, function (err, accountDoc) {
 											if (err) { console.log(err) }
 											else {
-												var notificationData =
-												{
+												// var reqID = requestDoc._id
+												// console.log(reqID)
+												accountDoc.notifications.push({
 													fulFiller_Email: data.fulfiller,
 													fulFiller_Name: fullName,
 													fulfiller_ExpoToken: doc.expoNotificationToken,
 													posterExpoToken: accountDoc.expoNotificationToken,
 													requestTitle: requestDoc.title,
 													requestBody: requestDoc.subtitle,
-													dateOfNotification: new Date(),
-													request_ID: requestDoc._id
-												}
-												console.log("Poster email: " + requestDoc.posterEmail)
-												Account.updateOne({ email: requestDoc.posterEmail }, { $push: { notifications: notificationData } },
-													function (err, response) {
-														if (err) { console.log(err) }
-														else {
-															console.log("Added to Account: " + notificationData)
-														}
-													})
-												console.log("Sending push notification")
-												let token = accountDoc.expoNotificationToken
-
-												//this.sendNotification(token)
+													request_ID: mongoose.Types.ObjectId(requestDoc._id),
+												})
+												var subdoc = accountDoc.notifications[0];
+												console.log("NOTIFICATION: " + subdoc);
+												subdoc.isNew;
+												
+												accountDoc.save(function(err){
+													if(err){console.log(err)}
+													else {
+														console.log("Notification added!")
+													}
+												})
 											}
 										})
-
-
-										//console.log(requestDoc.posterEmail)
-										//io.sockets.in(requestDoc.posterEmail).emit("newFulfillerNotification", (submitData))
 									}
 								})
 							}
@@ -437,8 +448,6 @@ io.on("connection", (socket) => {
 			console.error(error)
 		}
 	})
-
-
 
 	//Pull notifications for the user requesting
 	socket.on("pullNotifications", (data) => {
@@ -678,6 +687,33 @@ io.on("connection", (socket) => {
 		}
 		catch (error) {
 			console.log(error)
+		}
+	})
+
+	socket.on("DeleteNotification", (data) => {
+		try{
+			console.log("Deleteing notification. ID Received:" + data.ID)
+			console.log("User is: " + data.email)
+			
+			Account.findOne({email: data.email}, function(err, account){
+				if(err){
+					console.log(err)
+					socket.emit("NoteDeleteCallback", "Error")
+				}
+				else {
+					account.notifications.id(data.ID).remove();
+					account.save(function(err){
+						if(err){console.log(err)}
+						else {
+							console.log("Notification Removed");
+							socket.emit("NoteDeleteCallback", "Success")
+						}
+					})
+				}
+			})
+		}
+		catch(error){
+			console.error(error.message)
 		}
 	})
 })
