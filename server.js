@@ -29,7 +29,7 @@ mongoose.connect(CONSTANTS.MONGO_URL, { useNewUrlParser: true })
 var count = 0;
 var db = mongoose.connection;
 
-//Scehma for the account Models
+//Scehma for the Nofiications
 var notificationSchema = new mongoose.Schema({
 	fulFiller_Email: 'string',
 	fulFiller_Name: 'string',
@@ -42,6 +42,7 @@ var notificationSchema = new mongoose.Schema({
 	notification_ID: mongoose.mongo.ObjectID
 })
 
+//Schema for my Accounts
 var accountSchema = new mongoose.Schema({
 	//TODO design and implement Account requirements
 	firstName: 'string',
@@ -54,6 +55,7 @@ var accountSchema = new mongoose.Schema({
 	expoNotificationToken: 'string'
 })
 
+//Request Schema 
 var requestSchema = new mongoose.Schema({
 	//TODO design and implement request requirements
 	title: 'string',
@@ -67,6 +69,7 @@ var requestSchema = new mongoose.Schema({
 	posterExpoToken: 'string',
 })
 
+//conversation Schema
 var conversationSchema = new mongoose.Schema({
 	user1: 'string',
 	user2: 'string',
@@ -97,6 +100,7 @@ io.on("connection", (socket) => {
 	count++;
 	console.log("User connected. User count: " + count);
 
+	//A client has connected
 	socket.on("join", (data) => {
 		try {
 			console.log("User is: " + data.email)
@@ -112,6 +116,11 @@ io.on("connection", (socket) => {
 		console.log("User disconnected. User count: " + count)
 	})
 
+	/**
+	 * Once a user offers to connect, generate
+	 * a notification and add it to the OP's
+	 * account
+	 */
 	socket.on("addNotificationTokenToAccount", (data) => {
 		try {
 			console.log("Notification Data: ", [data.token, data.email])
@@ -186,6 +195,11 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	/**
+	 * Generate new User model and add it to our DB.
+	 * This account is eventually cross checked 
+	 * with logging in
+	 */
 	socket.on("newUserRegistration", (data) => {
 
 		try {
@@ -273,6 +287,12 @@ io.on("connection", (socket) => {
 
 	})
 
+	/** 
+	 * The user submits the 6 digit pin gotten
+	 * from their email and is checked against
+	 * the pin in their account in order to 
+	 * verify it
+	 */
 	socket.on("verifyNewAccount", (data) => {
 
 		try {
@@ -331,6 +351,12 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	/**
+	 * Cross check the email and password
+	 * submitted from the login screen with
+	 * what is store in the account with the 
+	 * email the user submitted
+	 */
 	socket.on("requestLogin", (data) => {
 		//console.log(data)
 
@@ -468,6 +494,10 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	/**
+	 * Create a conversation between the 2 accounts
+	 * if the request OP accepts the offer to help
+	 */
 	socket.on("createConversation", (data) => {
 		try {
 			console.log("Convo Data Received: " + (data))
@@ -508,6 +538,8 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	//Load conversation the user is a part of when loading
+	//the conversation tab
 	socket.on("requestConversations", (data) => {
 		try {
 			console.log("User is requesting their conversations. User is: " + data.email)
@@ -537,6 +569,12 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	/**
+	 * When loading a conversation, I need the userID
+	 * in order to properly sort the messages and check
+	 * who the poster of the request is for closing
+	 * properly
+	 */
 	socket.on("requestUserID", (data) => {
 		try {
 			console.log("User is requesting their User_ID: " + data.email)
@@ -554,6 +592,9 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	/**
+	 * Add new message to the conversation thread
+	 */
 	socket.on("addMessageToConvo", (data) => {
 		try {
 			console.log("ID: " + data._ID)
@@ -578,6 +619,7 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	//Load the messages in the specific thread when thread is loaded
 	socket.on("requestConversationMessages", (data) => {
 		try {
 			console.log("Convo_ID for requesting Messages received is: " + data.convo_ID)
@@ -608,6 +650,8 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	//Load all active requests the user has made in the
+	//Personal Request screen
 	socket.on("requestPersonalRequests", (data) => {
 		try {
 			console.log("User requesting their personal Requests: " + data)
@@ -626,6 +670,7 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	//Delete the request the user has selected
 	socket.on("deletePersonalRequest", (request_ID) => {
 		try {
 			console.log("Requesting to delete request with ID: " + request_ID)
@@ -656,6 +701,7 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	//Remove a specific message thread via it's ID
 	socket.on("removeConversationOnly", (convo_ID) => {
 		try {
 			console.log("Deleting conversation only with ID: " + convo_ID)
@@ -674,6 +720,8 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	//Get the creator of a request inside a Conversation
+	//so I can limit who can actually close it
 	socket.on("requestConversationRequestCreator", (request_ID) => {
 		console.log("Getting creator email for request: " + request_ID)
 
@@ -690,6 +738,7 @@ io.on("connection", (socket) => {
 		}
 	})
 
+	//Remove notification from User's account
 	socket.on("DeleteNotification", (data) => {
 		try{
 			console.log("Deleteing notification. ID Received:" + data.ID)
