@@ -501,7 +501,34 @@ io.on("connection", (socket) => {
 				if (err) { console.log(err) }
 				//Conversation related to request found
 				else if (convoDoc) {
-					socket.emit("convoReturn", (true))
+					if(convoDoc.isPublic)
+					{
+						console.log("Conversation is Active")
+						socket.emit("convoReturn", (true))
+					}
+					else{
+						console.log("Conversation is not public")
+						var newConversation = new Conversation({
+							user1: data.user1,
+							user2: data.user2,
+							user1Name: data.user1Name,
+							user2Name: data.user2Name,
+							request_ID: data.request_ID,
+							requestType: data.requestType,
+							user1ExpoToken: data.user1ExpoToken,
+							user2ExpoToken: data.user2ExpoToken
+						})
+	
+						console.log("Conversation created")
+	
+						newConversation.save(function (err, convo) {
+							if (err) { console.log(err) }
+							else {
+								console.log("Conversation Saved to DB: " + convo)
+								socket.emit("convoReturn", (false))
+							}
+						})
+					}
 				}
 				//no conversation exists
 				else {
@@ -681,7 +708,7 @@ io.on("connection", (socket) => {
 					Request.findOneAndUpdate({ _id: request_ID }, { isPublic: false }, function (err, response) {
 						if (err) { console.log(err) }
 						else {
-							Conversation.findOneAndUpdate({ request_ID: request_ID }, { isPublic: false }, function (err, response) {
+							Conversation.updateMany({ request_ID: request_ID }, { isPublic: false }, function (err, response) {
 								if (err) { console.log(err) }
 								else {
 									socket.emit("deletingRequestCallback", ("success"))
