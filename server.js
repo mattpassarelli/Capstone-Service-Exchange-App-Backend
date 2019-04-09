@@ -39,7 +39,6 @@ var notificationSchema = new mongoose.Schema({
 	requestBody: 'string',
 	dateOfNotification: { type: String, default: new Date() },
 	request_ID: mongoose.mongo.ObjectID,
-	notification_ID: mongoose.mongo.ObjectID
 })
 
 //Schema for my Accounts
@@ -221,10 +220,6 @@ io.on("connection", (socket) => {
 
 				//No account found
 				else {
-
-					/**
-					 * TODO: ADD CALLBack for if this whole thing fails
-					 */
 
 					//Verify email with WHOIS to make sure it's a valid email
 					verifier.verify(data.email, (error, rtn) => {
@@ -751,6 +746,7 @@ io.on("connection", (socket) => {
 				}
 				else {
 					account.notifications.id(data.ID).remove();
+
 					account.save(function(err){
 						if(err){console.log(err)}
 						else {
