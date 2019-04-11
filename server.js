@@ -122,12 +122,12 @@ io.on("connection", (socket) => {
 	 */
 	socket.on("addNotificationTokenToAccount", (data) => {
 		try {
-			console.log("Notification Data: ", [data.token, data.email])
+			//console.log("Notification Data: ", [data.token, data.email])
 
 			Account.findOneAndUpdate({ email: data.email }, { expoNotificationToken: data.token }, function (err, doc) {
 				if (err) { console.log(err) }
 				else {
-					console.log("Notification token added to account")
+					console.log("Notification token added to account: " + data.email)
 				}
 			})
 		}
@@ -164,7 +164,7 @@ io.on("connection", (socket) => {
 						if (err) { throw err }
 
 						else {
-							console.log("Request added: " + request)
+							//console.log("Request added: " + request)
 							socket.emit("requestAddCallback", ("success"))
 						}
 					})
@@ -228,7 +228,7 @@ io.on("connection", (socket) => {
 							console.log(rtn)
 
 							if (rtn.formatCheck === 'true' && rtn.smtpCheck === 'true' && rtn.dnsCheck === 'true') {
-								console.log("FORMATING GOOD!!")
+								//console.log("FORMATING GOOD!!")
 
 								var newUser = new Account({
 									firstName: data.firstName, lastName: data.lastName,
@@ -243,7 +243,7 @@ io.on("connection", (socket) => {
 									html: (verificationEmail)
 								}
 
-								console.log("New user data: " + newUser)
+								//console.log("New user data: " + newUser)
 
 								transporter.sendMail(verificationEmailOptions, function (err, info) {
 									if (err) { console.log(err) }
@@ -291,12 +291,12 @@ io.on("connection", (socket) => {
 	socket.on("verifyNewAccount", (data) => {
 
 		try {
-			console.log(data)
+			//console.log(data)
 
 			Account.findOne({ email: data.email }, function (err, docs) {
 				if (err) { console.log(err) }
 				else {
-					console.log(docs)
+					//console.log(docs)
 					var rtnMessage = "Default Messages"
 					var codeFromAccount = docs.verificationCode
 					var codeFromUser = data.pinCode
@@ -366,7 +366,7 @@ io.on("connection", (socket) => {
 				else {
 					//found account
 					console.log("Accound found for email: " + data.email)
-					console.log(doc)
+					//console.log(doc)
 
 					if (doc.verified === true) {
 						console.log("Account is Verified. Checking passwords")
@@ -400,7 +400,7 @@ io.on("connection", (socket) => {
 	//Someone has offered to fulfill a request
 	socket.on("offerToConnect", (data) => {
 		try {
-			console.log(data)
+			//console.log(data)
 
 			//Find the request the user selected
 			Request.findOne({ _id: data.request_ID }, function (err, requestDoc) {
@@ -422,7 +422,7 @@ io.on("connection", (socket) => {
 									if (err) { console.log(err) }
 									else {
 										var fullName = doc.firstName + " " + doc.lastName
-										console.log("Fulfiller name: " + fullName)
+										//console.log("Fulfiller name: " + fullName)
 
 										console.log("Fulfiller added to Request!")
 
@@ -447,7 +447,7 @@ io.on("connection", (socket) => {
 													request_ID: mongoose.Types.ObjectId(requestDoc._id),
 												})
 												var subdoc = accountDoc.notifications[0];
-												console.log("NOTIFICATION: " + subdoc);
+												//console.log("NOTIFICATION: " + subdoc);
 												subdoc.isNew;
 												
 												accountDoc.save(function(err){
@@ -495,7 +495,7 @@ io.on("connection", (socket) => {
 	 */
 	socket.on("createConversation", (data) => {
 		try {
-			console.log("Convo Data Received: " + (data))
+			//console.log("Convo Data Received: " + (data))
 
 			Conversation.findOne({ request_ID: data.request_ID }, function (err, convoDoc) {
 				if (err) { console.log(err) }
@@ -578,7 +578,7 @@ io.on("connection", (socket) => {
 				//found conversations with that email
 				else if (docs) {
 					console.log("Potentially Found conversations with that email.")
-					console.log(docs)
+					//console.log(docs)
 					socket.emit("conversationsFound", (docs))
 				}
 				else {
@@ -602,7 +602,7 @@ io.on("connection", (socket) => {
 			console.log("User is requesting their User_ID: " + data.email)
 
 			Account.findOne({ email: data.email }, function (err, doc) {
-				console.log("Account Found: " + doc)
+				//console.log("Account Found: " + doc)
 
 				var user_ID = doc._id
 				console.log("ID is: " + user_ID)
@@ -619,14 +619,16 @@ io.on("connection", (socket) => {
 	 */
 	socket.on("addMessageToConvo", (data) => {
 		try {
-			console.log("ID: " + data._ID)
-			console.log("Messages: " + data.messages)
+			//console.log("ID: " + data._ID)
+			//console.log("Messages: " + data.messages)
 
 			Conversation.findOneAndUpdate({ _id: data._ID }, { $push: { messages: data.messages } },
 				function (err, reponse) {
 					if (err) { console.log(err) }
 					else {
-						console.log("Added: " + data.messages + " to conversation: " + data._ID)
+						//console.log("Added: " + data.messages + " to conversation: " + data._ID)
+
+						console.log("Message added to conversation")
 
 						//emit the socket to tell the other user to pull the message
 						//IF they are actively in the chat screen
@@ -644,8 +646,8 @@ io.on("connection", (socket) => {
 	//Load the messages in the specific thread when thread is loaded
 	socket.on("requestConversationMessages", (data) => {
 		try {
-			console.log("Convo_ID for requesting Messages received is: " + data.convo_ID)
-			console.log("Looking for conversation with that ID")
+			// console.log("Convo_ID for requesting Messages received is: " + data.convo_ID)
+			// console.log("Looking for conversation with that ID")
 
 			Conversation.findOne({ _id: data.convo_ID }, function (err, convo) {
 				if (err) { console.log(err) }
@@ -653,9 +655,9 @@ io.on("connection", (socket) => {
 					console.log("Conversation found. Grabbing Messages")
 
 					var messages = convo.messages
-					console.log("Messages are: " + convo.messages)
+					//console.log("Messages are: " + convo.messages)
 					//or because I can't make JSONs work
-					console.log("Messages are: " + convo)
+					//console.log("Messages are: " + convo)
 					/**
 					 * I guess since I have no real contorl over how I'm
 					 * pulling the data from the DB, the messages come in
@@ -681,7 +683,7 @@ io.on("connection", (socket) => {
 			Request.find({ $and: [{ posterEmail: data }, { isPublic: true }] }, function (err, docs) {
 				if (err) { console.log(err) }
 				else {
-					console.log("Requests found for user: " + docs)
+					//console.log("Requests found for user: " + docs)
 					console.log("Found Requests. Sending to user")
 
 					socket.emit("personalRequestsReceived", (docs))
@@ -764,7 +766,7 @@ io.on("connection", (socket) => {
 	socket.on("DeleteNotification", (data) => {
 		try{
 			console.log("Deleteing notification. ID Received:" + data.ID)
-			console.log("User is: " + data.email)
+			//console.log("User is: " + data.email)
 			
 			Account.findOne({email: data.email}, function(err, account){
 				if(err){
