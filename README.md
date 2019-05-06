@@ -1,3 +1,6 @@
+# This Project is now dead.
+It served my purpose for a capstone. Should I want to return to it, it will need rebuilding from the ground up with newer experiences and better everything.
+
 # CPSC 498 Capstone - UExchange Backend
 
 UExchange is designed to make it easy for college students to find help with common and uncommon tasks alike, like moving furniture, finding rides, finding old textbooks, and more. Using a simple and responsive UI build with React Native, UExchange will be available on both iOS and Android from the same source code. This makes it easy for college students to connect with each other for a common goal of helping each other thrive. 
